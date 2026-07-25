@@ -1,0 +1,38 @@
+research-agent/
+├── backend/
+│   ├── app/
+│   │   ├── main.py                 # FastAPI app, websocket endpoint
+│   │   ├── agents/
+│   │   │   ├── planner.py          # breaks question into sub-questions
+│   │   │   ├── researcher.py       # runs searches, collects evidence
+│   │   │   ├── writer.py           # drafts answer from evidence
+│   │   │   └── critic.py           # verifies claims, flags issues
+│   │   ├── orchestrator.py         # the state machine tying agents together
+│   │   ├── tools/
+│   │   │   ├── web_search.py       # Tavily/Brave wrapper
+│   │   │   └── source_store.py     # dedupe + cache retrieved sources
+│   │   ├── models/
+│   │   │   ├── schemas.py          # Pydantic models: Plan, Evidence, Draft, Critique
+│   │   │   └── db.py               # SQLAlchemy models for sessions/traces
+│   │   ├── evaluation/
+│   │   │   └── claim_checker.py    # sentence-vs-source support checker
+│   │   └── config.py
+│   ├── tests/
+│   │   ├── test_planner.py
+│   │   ├── test_critic.py
+│   │   └── test_orchestrator.py    # integration test: full loop on fixed question
+│   ├── requirements.txt
+│   └── Dockerfile
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── TraceView.tsx       # live plan/research/draft/critique panels
+│   │   │   ├── SourceList.tsx
+│   │   │   └── AnswerCard.tsx
+│   │   ├── hooks/
+│   │   │   └── useAgentSocket.ts   # WebSocket connection to backend
+│   │   └── App.tsx
+│   └── package.json
+├── docs/
+│   └── design-decisions.md         # your write-up — this sells the project
+└── README.md
