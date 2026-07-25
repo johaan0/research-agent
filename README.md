@@ -22,7 +22,7 @@ cp .env.example .env
 ```
 
 Fill in `.env`:
-- `ANTHROPIC_API_KEY` — from console.anthropic.com
+- `GROQ_API_KEY` — from console.groq.com
 - `TAVILY_API_KEY` — from tavily.com (free tier is enough for dev)
 
 ## Run it
