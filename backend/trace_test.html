@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Research Agent — Live Trace</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; background: #0f1117; color: #e4e4e7; }
+  h1 { font-size: 20px; }
+  input { width: 70%; padding: 10px; font-size: 14px; background: #1c1f2a; border: 1px solid #333; color: #e4e4e7; border-radius: 6px; }
+  button { padding: 10px 16px; font-size: 14px; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; margin-left: 8px; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .stage { margin: 16px 0; padding: 14px; border-radius: 8px; background: #1c1f2a; border-left: 3px solid #4f46e5; }
+  .stage h3 { margin: 0 0 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #a5b4fc; }
+  .stage pre { white-space: pre-wrap; word-break: break-word; font-size: 13px; margin: 0; color: #d4d4d8; }
+  .needs-revision { border-left-color: #f59e0b; }
+  .clean { border-left-color: #22c55e; }
+  .final { border-left-color: #22c55e; background: #14261c; }
+  .error { border-left-color: #ef4444; background: #2a1616; }
+  #status { font-size: 13px; color: #888; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <h1>Research Agent — Live Trace </h1>
+  <input id="question" placeholder="Ask a research question..." value="What are the tradeoffs of RAG vs fine-tuning?">
+  <button id="runBtn" onclick="runResearch()">Run</button>
+  <div id="status"></div>
+  <div id="trace"></div>
+
+<script>
+function runResearch() {
+  const question = document.getElementById('question').value.trim();
+  if (!question) return;
+
+  document.getElementById('trace').innerHTML = '';
+  document.getElementById('status').textContent = 'Connecting...';
+  document.getElementById('runBtn').disabled = true;
+
+ const ws = new WebSocket('ws://127.0.0.1:8000/ws/research');
+
+  ws.onopen = () => {
+    document.getElementById('status').textContent = 'Connected — sending question...';
+    ws.send(JSON.stringify({ question }));
+  };
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    addStage(msg.stage, msg.data);
+    if (msg.stage === 'done' || msg.stage === 'error') {
+      document.getElementById('runBtn').disabled = false;
+      document.getElementById('status').textContent = msg.stage === 'done' ? 'Complete' : 'Failed';
+    }
+  };
+
+  ws.onerror = () => {
+    document.getElementById('status').textContent = 'WebSocket error — is the server running?';
+    document.getElementById('runBtn').disabled = false;
+  };
+
+  ws.onclose = () => {
+    if (document.getElementById('status').textContent === 'Connected — sending question...') {
+      document.getElementById('status').textContent = 'Connection closed';
+    }
+  };
+}
+
+function addStage(stage, data) {
+  const container = document.getElementById('trace');
+  const div = document.createElement('div');
+  div.className = 'stage';
+
+  if (stage === 'session_started') {
+    div.innerHTML = `<h3>Session Started</h3><pre>ID: ${data.session_id}</pre>`;
+  } else if (stage === 'plan') {
+    div.innerHTML = `<h3>Plan</h3><pre>${data.sub_questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}</pre>`;
+  } else if (stage === 'evidence') {
+    const totalSnippets = data.reduce((sum, e) => sum + e.snippets.length, 0);
+    div.innerHTML = `<h3>Evidence</h3><pre>Found ${totalSnippets} source snippets across ${data.length} sub-questions</pre>`;
+  } else if (stage === 'revision_cycle') {
+    const needsRevision = data.critique.needs_revision;
+    div.className += needsRevision ? ' needs-revision' : ' clean';
+    const issues = data.critique.unsupported_claims.length + data.critique.uncited_claims.length;
+    div.innerHTML = `<h3>Draft — Cycle ${data.cycle} ${needsRevision ? `(${issues} issue(s) found)` : '(passed)'}</h3><pre>${escapeHtml(data.draft.answer.slice(0, 400))}${data.draft.answer.length > 400 ? '...' : ''}</pre>`;
+  } else if (stage === 'done') {
+    div.className += ' final';
+    div.innerHTML = `<h3>Final Answer</h3><pre>${escapeHtml(data.final_answer)}</pre>`;
+  } else if (stage === 'error') {
+    div.className += ' error';
+    div.innerHTML = `<h3>Error</h3><pre>${escapeHtml(data.message)}</pre>`;
+  }
+
+  container.appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+function escapeHtml(str) {
+  const p = document.createElement('p');
+  p.textContent = str;
+  return p.innerHTML;
+}
+</script>
+</body>
+</html>
